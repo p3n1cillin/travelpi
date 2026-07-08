@@ -8,6 +8,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 echo "This installs TravelPi AP config templates. Review configs/hostapd.conf.example first."
 echo "Set WIFI_PASSPHRASE before running, or edit /etc/hostapd/hostapd.conf manually on the Pi."
 : "${WIFI_PASSPHRASE:?WIFI_PASSPHRASE is required}"
+if (( ${#WIFI_PASSPHRASE} < 8 || ${#WIFI_PASSPHRASE} > 63 )); then
+  echo "WIFI_PASSPHRASE must be 8-63 characters for WPA2-PSK." >&2
+  exit 1
+fi
 
 tmpdir="$(mktemp -d)"
 trap 'rm -rf "$tmpdir"' EXIT
@@ -31,6 +35,20 @@ scp -i "$SSH_KEY" "$tmpdir/hostapd.conf" "$ROOT_DIR/configs/dnsmasq-travel-ap.co
 
 ssh -i "$SSH_KEY" -o BatchMode=yes "$PI_HOST" '
   set -e
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  sudo mkdir -p /root/travelpi-config-backups/"$stamp"
+  for path in \
+    /etc/hostapd/hostapd.conf \
+    /etc/dnsmasq.d/travel-ap.conf \
+    /etc/travel-ap.nft \
+    /etc/systemd/system/travel-ap-net.service \
+    /etc/NetworkManager/conf.d/99-unmanage-ap.conf \
+    /etc/sysctl.d/99-travelap.conf
+  do
+    if [ -e "$path" ]; then
+      sudo cp -a "$path" /root/travelpi-config-backups/"$stamp"/
+    fi
+  done
   sudo cp /tmp/hostapd.conf /etc/hostapd/hostapd.conf
   sudo cp /tmp/dnsmasq-travel-ap.conf /etc/dnsmasq.d/travel-ap.conf
   sudo cp /tmp/travel-ap.nft /etc/travel-ap.nft
@@ -39,5 +57,6 @@ ssh -i "$SSH_KEY" -o BatchMode=yes "$PI_HOST" '
   sudo cp /tmp/99-travelap.conf /etc/sysctl.d/99-travelap.conf
   sudo systemctl daemon-reload
   sudo systemctl enable travel-ap-net hostapd dnsmasq
+  echo "Backups, if any, are in /root/travelpi-config-backups/$stamp"
   echo "Configs installed. Reboot the Pi to apply AP changes safely."
 '
