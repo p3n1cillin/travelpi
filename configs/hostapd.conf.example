@@ -1,0 +1,17 @@
+interface=wlan0
+driver=nl80211
+country_code=GB
+ieee80211d=1
+hw_mode=g
+channel=6
+ssid=Living Room
+wmm_enabled=1
+ieee80211n=1
+require_ht=0
+ht_capab=[SHORT-GI-20][RX-STBC1][MAX-AMSDU-7935]
+auth_algs=1
+wpa=2
+wpa_key_mgmt=WPA-PSK
+rsn_pairwise=CCMP
+wpa_passphrase=CHANGE_ME
+ctrl_interface=/var/run/hostapd

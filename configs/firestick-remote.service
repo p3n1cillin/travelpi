@@ -1,0 +1,16 @@
+[Unit]
+Description=Firestick Remote Web
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/firestick-remote-web
+Environment=FIRESTICK_TARGET=
+ExecStart=/usr/bin/python3 /opt/firestick-remote-web/server.py --host 0.0.0.0 --port 8787
+Restart=on-failure
+RestartSec=3
+User=pwned
+
+[Install]
+WantedBy=multi-user.target

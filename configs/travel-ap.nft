@@ -1,0 +1,15 @@
+#!/usr/sbin/nft -f
+add table ip travelap
+delete table ip travelap
+table ip travelap {
+    chain postrouting {
+        type nat hook postrouting priority srcnat; policy accept;
+        ip saddr 192.168.50.0/24 oifname "eth0" masquerade
+        ip saddr 192.168.50.0/24 oifname "tailscale0" masquerade
+    }
+    chain forward {
+        type filter hook forward priority filter + 10; policy accept;
+        ip saddr 192.168.50.0/24 accept
+        ip daddr 192.168.50.0/24 ct state established,related accept
+    }
+}

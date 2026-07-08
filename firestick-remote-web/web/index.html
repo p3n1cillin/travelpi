@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Fire TV Remote</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="remote" aria-label="Fire TV remote">
+      <header class="topbar">
+        <button id="power" data-key="power" class="icon-button" aria-label="Power">⏻</button>
+        <div class="device-wrap">
+          <label for="deviceSelect">Fire TV</label>
+          <select id="deviceSelect" aria-label="Fire TV device"></select>
+        </div>
+        <button id="refreshDevices" class="icon-button" aria-label="Refresh devices">↻</button>
+      </header>
+
+      <section class="touchpad" aria-label="Navigation pad">
+        <button data-key="up" class="pad-hit pad-up" aria-label="Up"></button>
+        <button data-key="left" class="pad-hit pad-left" aria-label="Left"></button>
+        <button data-key="right" class="pad-hit pad-right" aria-label="Right"></button>
+        <button data-key="down" class="pad-hit pad-down" aria-label="Down"></button>
+        <button data-key="select" class="ok-button" aria-label="Select">OK</button>
+        <span class="chevron chevron-up">⌃</span>
+        <span class="chevron chevron-left">‹</span>
+        <span class="chevron chevron-right">›</span>
+        <span class="chevron chevron-down">⌄</span>
+      </section>
+
+      <section class="system-row">
+        <button data-key="back" aria-label="Back">‹</button>
+        <button data-key="home" data-long-key="home" aria-label="Home">⌂</button>
+        <button data-key="menu" data-long-key="menu" aria-label="Menu">☰</button>
+      </section>
+
+      <section class="media-row">
+        <button data-key="previous" aria-label="Previous">⏮</button>
+        <button data-key="rewind" aria-label="Rewind">⏪</button>
+        <button data-key="play_pause" aria-label="Play pause">⏯</button>
+        <button data-key="fast_forward" aria-label="Fast forward">⏩</button>
+        <button data-key="next" aria-label="Next">⏭</button>
+      </section>
+
+      <section class="volume-row">
+        <button data-key="volume_down" aria-label="Volume down">−</button>
+        <button data-key="mute" aria-label="Mute">Mute</button>
+        <button data-key="volume_up" aria-label="Volume up">+</button>
+      </section>
+
+      <section class="utility-row">
+        <button data-key="search" aria-label="Search">Search</button>
+        <button data-key="settings" aria-label="Settings">Settings</button>
+        <button data-key="recents" aria-label="Recent apps">Recents</button>
+        <button data-key="info" aria-label="Info">Info</button>
+        <button data-key="captions" aria-label="Captions">CC</button>
+        <button data-key="page_up" aria-label="Page up">Pg +</button>
+        <button data-key="page_down" aria-label="Page down">Pg -</button>
+        <button data-key="delete" aria-label="Delete">Del</button>
+      </section>
+
+      <section class="text-entry">
+        <input id="text" placeholder="Keyboard" autocomplete="off" />
+        <button id="sendText" aria-label="Send text">Send</button>
+      </section>
+
+      <section id="appRow" class="app-row"></section>
+
+      <section class="access">
+        <button id="toggleAccess">Access URLs</button>
+        <div id="accessList" class="access-list" hidden></div>
+      </section>
+
+      <p id="status" class="status">Connecting</p>
+    </main>
+
+    <div id="toast" class="toast"></div>
+    <script src="/app.js"></script>
+  </body>
+</html>
