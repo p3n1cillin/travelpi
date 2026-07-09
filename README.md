@@ -23,11 +23,16 @@ and routes AP clients over normal internet plus Tailscale back to the home Jelly
 
 ## Current Live Addresses
 
+- Pi AP SSID: `travelpi`
 - Pi AP gateway: `192.168.50.1`
+- **WiFi selection portal (hotel WiFi picker): `http://192.168.50.1/`** (port 80, always on)
 - Remote web app on Pi AP: `http://192.168.50.1:8787/`
 - Tailscale address: `100.119.216.79`
 - Remote web app on Tailscale: `http://100.119.216.79:8787/`
 - mDNS when available: `http://wifipi.local:8787/`
+
+Interfaces: `eth0` = wired uplink, `wlan0` = Archer T3U access point (the `travelpi`
+SSID), `wlan1` = client dongle used to join upstream WiFi (hotels).
 
 The Ethernet/router-side address is DHCP by design and can change per router. Do not hard-code
 it for travel use; use the AP address or Tailscale address instead.
@@ -140,7 +145,7 @@ http://100.119.216.79:8787/
 
 ## Firestick Setup
 
-Connect the Firestick to the TravelPi AP, currently `Living Room`, then enable ADB debugging on the Firestick.
+Connect the Firestick to the TravelPi AP, currently `travelpi`, then enable ADB debugging on the Firestick.
 Open the remote app from a phone or laptop on the AP:
 
 ```bash
@@ -161,3 +166,75 @@ Approve the prompt on the Firestick. After that, the web app should find it.
 This repo is enough to recreate the TravelPi application and service configuration on a normal Raspberry Pi OS
 install without wiping Tailscale. A clone cannot fully recreate external state: the base OS image, Tailscale login,
 WiFi password, home network routes, and Firestick ADB pairing still have to be supplied by the person setting it up.
+
+## Hotel WiFi (no router access)
+
+When there is no Ethernet to plug into, the Pi joins the venue WiFi on the **client dongle
+`wlan1`** and keeps hosting the `travelpi` AP on `wlan0`. Because you can't reach a router
+you don't control, there is an **always-on web GUI on the AP itself** to pick the network:
+
+1. Connect a phone/laptop to the `travelpi` AP.
+2. Open `http://192.168.50.1/` (the WiFi portal — served on port 80, works with no internet yet).
+3. Tap **Scan**, choose the venue WiFi, enter its password, **Connect**.
+4. Once it shows "Online", the Firestick has internet + the Tailscale path home.
+
+The portal is `wifi-portal/app.py` (Flask, runs as root via `travelpi-portal.service`) and
+drives `nmcli` on `wlan1`. NAT masquerades AP traffic out whichever WAN is active — `eth0`,
+`wlan1`, or `tailscale0` (see `configs/travel-ap.nft`). Deploy with:
+
+```bash
+# copy wifi-portal/app.py to /opt/travelpi-portal/app.py and install the unit
+sudo install -D wifi-portal/app.py /opt/travelpi-portal/app.py
+sudo cp wifi-portal/travelpi-portal.service /etc/systemd/system/
+sudo systemctl enable --now travelpi-portal.service
+```
+
+## Split-tunnel routing (important)
+
+Tailscale runs with `--accept-routes` so the Pi can reach the home `192.168.0.0/24` subnet
+(advertised by the home Tailscale subnet router). A protective policy rule keeps the Pi's
+**own** traffic to that subnet on `eth0` while only **forwarded** Firestick traffic is
+tunnelled — without it, at home the Pi would route its own LAN traffic through the tunnel and
+become unreachable on the LAN. Installed as a drop-in on `travel-ap-net.service`
+(`configs/10-protect-own-lan.conf`):
+
+```
+ip rule add iif lo to 192.168.0.0/24 lookup main priority 50
+```
+
+## Self-healing, error-checking and auto-update
+
+`scripts/install-selfheal.sh` (run on the Pi) installs:
+
+- **`travelpi-selfheal.timer`** — 2 min after boot and every 10 min: restarts any dead core
+  service (`tailscaled`, `hostapd`, `dnsmasq`, `travel-ap-net`, `firestick-remote`,
+  `travelpi-portal`), re-asserts the AP address, tailscale connection, protective route and IP
+  forwarding, and pushes an alert if something can't be recovered.
+- **`travelpi-update.timer`** — weekly `apt` full-upgrade when online, `Persistent=true` so a
+  missed run (Pi off/away) catches up on next boot.
+- **`notify.sh`** — ntfy push alerts (same private topic as the rest of the homelab) for update
+  results and unrecoverable self-heal issues.
+
+Everything needed for the Firestick to work is enabled on boot: `tailscaled`, `hostapd`,
+`dnsmasq`, `travel-ap-net`, `firestick-remote`, `travelpi-portal`.
+
+## Performance / no double-NAT
+
+Fast remote streaming needs a **direct** Tailscale path (not a DERP relay). That requires the
+home side to be a single NAT with working port-mapping. With the Deco plugged straight into the
+ONT (no ISP-router NAT in front), `tailscale netcheck` on the home node reports
+`PortMapping: UPnP, NAT-PMP` and `MappingVariesByDestIP: false` ("easy" NAT), and peers connect
+`direct` instead of via a relay. Confirm any time with:
+
+```bash
+tailscale netcheck          # want UPnP/NAT-PMP + MappingVariesByDestIP:false
+tailscale status            # the home peer line should say "direct ...", not "relay"
+```
+
+## Change log
+
+- **2026-07-09** — AP renamed `Living Room` -> `travelpi` (was clashing with the home SSID; the
+  known-good backup `hostapd.conf.good` was updated too). Added the hotel WiFi client mode on
+  `wlan1` + the always-on WiFi selection portal. Added `wlan1` to the NAT masquerade set. Added
+  the split-tunnel protective route. Added self-heal + weekly auto-update + ntfy alerts.
+  Verified the Tailscale path home is now **direct** after the double-NAT was removed.

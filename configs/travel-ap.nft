@@ -4,7 +4,9 @@ delete table ip travelap
 table ip travelap {
     chain postrouting {
         type nat hook postrouting priority srcnat; policy accept;
+        # Masquerade AP-client traffic out whichever WAN is in use.
         ip saddr 192.168.50.0/24 oifname "eth0" masquerade
+        ip saddr 192.168.50.0/24 oifname "wlan1" masquerade
         ip saddr 192.168.50.0/24 oifname "tailscale0" masquerade
     }
     chain forward {

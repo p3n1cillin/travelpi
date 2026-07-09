@@ -1,0 +1,16 @@
+[Unit]
+Description=TravelPi WiFi selection portal (always-on, served on the AP)
+# Start early and independently of any upstream connectivity so the portal is
+# reachable on the AP even with no WiFi/internet yet.
+After=network.target hostapd.service travel-ap-net.service
+Wants=hostapd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/travelpi-portal/app.py
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target
