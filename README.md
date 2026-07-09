@@ -218,6 +218,19 @@ ip rule add iif lo to 192.168.0.0/24 lookup main priority 50
 Everything needed for the Firestick to work is enabled on boot: `tailscaled`, `hostapd`,
 `dnsmasq`, `travel-ap-net`, `firestick-remote`, `travelpi-portal`.
 
+### Never lose the portal / remote (addresses)
+
+The access addresses are already **static/stable** — the AP is a hard-coded static
+`192.168.50.1`, and the Tailscale address `100.x` never changes:
+
+- Portal: `http://192.168.50.1/`
+- Firestick remote (WiFi): `http://192.168.50.1:8787/`
+- Firestick remote (Tailscale): `http://100.119.216.79:8787/`
+
+Only the `eth0` LAN IP is DHCP. `scripts/install-announce.sh` adds a boot service +
+NetworkManager dispatcher (`travelpi-announce`) that **pushes all current addresses to ntfy**
+whenever the Pi comes online or its WAN IP changes, so the LAN URL is always known too.
+
 ## Performance / no double-NAT
 
 Fast remote streaming needs a **direct** Tailscale path (not a DERP relay). That requires the
