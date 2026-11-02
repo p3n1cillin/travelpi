@@ -10,7 +10,7 @@ async function api(path, payload = null) {
   const options = payload
     ? {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-TravelPi": "1" },
         body: JSON.stringify(payload),
       }
     : {};
@@ -109,6 +109,7 @@ function renderAccess(urls) {
 function press(key, longpress = false) {
   fetch(`/k/${encodeURIComponent(key)}${longpress ? "?long=1" : ""}`, {
     cache: "no-store",
+    headers: { "X-TravelPi": "1" },
     keepalive: true,
     priority: "high",
   }).catch((error) => toast(error.message));

@@ -197,6 +197,12 @@ unless the client is on the home subnet `192.168.0.0/24`. The AP (`wlan0`), Tail
 home LAN are unaffected, and no other port (SSH included) is filtered. A venue wired network that
 also uses `192.168.0.0/24` would still get through, so prefer the AP or Tailscale when away.
 
+Both services also refuse requests from other websites. Anything that changes state (every POST,
+and the remote's `/k/<key>` presses) must carry an `X-TravelPi: 1` header, which the bundled pages
+send and a page on another site cannot. Requests whose `Host` isn't an IP address, a single-label
+name, `*.local` or `*.ts.net` are refused (DNS rebinding). To script the remote, send the header:
+`curl -H 'X-TravelPi: 1' http://192.168.50.1:8787/k/home`.
+
 ## Split-tunnel routing (important)
 
 Tailscale runs with `--accept-routes` so the Pi can reach the home `192.168.0.0/24` subnet

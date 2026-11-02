@@ -18,6 +18,11 @@ jobs:
       - name: Firestick remote tests
         working-directory: firestick-remote-web
         run: python -m unittest -v test_server.py
+      - name: WiFi portal tests
+        working-directory: wifi-portal
+        run: |
+          python -m pip install --quiet flask
+          python -m unittest -v test_app.py
       - name: Python syntax
         run: python -m py_compile firestick-remote-web/server.py wifi-portal/app.py
       - name: Shell syntax
