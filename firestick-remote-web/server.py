@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import mimetypes
 import os
@@ -250,10 +251,17 @@ class FirestickRemote:
             raise RemoteError(HTTPStatus.BAD_REQUEST, "Text is required")
         if any(ord(ch) < 32 or ord(ch) == 127 for ch in text):
             raise RemoteError(HTTPStatus.BAD_REQUEST, "Text cannot contain control characters")
-        escaped = text.replace("%", "%25").replace(" ", "%s")
+        # `input text` turns "%s" into a space and types every other character
+        # as-is; it does not decode %25, so the old "%" -> "%25" typed "50%" as
+        # "50%25". A literal "%s" has no escape, so split the text between "%"
+        # and "s" and send the pieces as consecutive commands.
+        pieces = re.split(r"(?<=%)(?=s)", text)
         # The command goes to the Firestick's shell, so quote it: unquoted,
         # text such as `a;reboot` or `$(...)` ran as shell commands there.
-        return self._shell_command(f"input text {shlex.quote(escaped)}", label="text")
+        command = " && ".join(
+            f"input text {shlex.quote(piece.replace(' ', '%s'))}" for piece in pieces
+        )
+        return self._shell_command(command, label="text")
 
     def launch(self, package: str) -> dict[str, Any]:
         package = package.strip()
@@ -452,6 +460,44 @@ class Application:
         return HTTPStatus.OK, content_type, target.read_bytes()
 
 
+# Every state-changing request must carry this header. A page on another site
+# cannot add a custom header to a cross-origin request without a CORS preflight,
+# which this server never answers, so forms, <img> tags and fetch() from other
+# sites are all refused. The bundled page sends it on every call.
+CSRF_HEADER = "X-TravelPi"
+
+
+def host_allowed(host_header: str | None) -> bool:
+    """True for the names this service is really reached by: an IP address,
+    a single-label name (localhost, travelpi), *.local or *.ts.net. Anything
+    else is a DNS-rebinding attempt: a public name pointed at the Pi so a
+    hostile page counts as same-origin."""
+    if not host_header:
+        return False
+    host = host_header.strip()
+    if host.startswith("["):
+        host = host[1:host.find("]")] if "]" in host else ""
+    elif host.count(":") == 1:
+        host = host.split(":", 1)[0]
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        pass
+    host = host.lower().rstrip(".")
+    return bool(host) and ("." not in host or host.endswith((".local", ".ts.net")))
+
+
+def request_refusal(method: str, path: str, headers: Any) -> str | None:
+    """Why a request must be refused, or None to serve it."""
+    if not host_allowed(headers.get("Host")):
+        return "Unrecognised Host header"
+    changes_state = method != "GET" or urlparse(path).path.startswith("/k/")
+    if changes_state and headers.get(CSRF_HEADER) != "1":
+        return f"Missing {CSRF_HEADER} header"
+    return None
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     application: Application
@@ -470,6 +516,16 @@ class Handler(BaseHTTPRequestHandler):
         return
 
     def _handle(self) -> None:
+        refusal = request_refusal(self.command, self.path, self.headers)
+        if refusal:
+            payload = json.dumps({"error": refusal}, separators=(",", ":")).encode()
+            self.send_response(HTTPStatus.FORBIDDEN)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         parsed = urlparse(self.path)
         if self.command == "GET" and parsed.path.startswith("/k/"):
             try:

@@ -10,12 +10,50 @@ Runs as root (needs nmcli to manage WiFi). The page is fully self-contained
 (inline CSS/JS, no external assets) because there is no internet when you first
 open it.
 """
+import ipaddress
 import subprocess
 from flask import Flask, request, jsonify, Response
 
 app = Flask(__name__)
 WIFI_IF = "wlan1"          # hotel-side client dongle
 PORT = 80
+
+
+# Every state-changing request must carry this header. A page on another site
+# cannot add a custom header to a cross-origin request without a CORS preflight,
+# which this server never answers, so forms, <img> tags and fetch() from other
+# sites are all refused. The bundled page sends it on every call.
+CSRF_HEADER = "X-TravelPi"
+
+
+def host_allowed(host_header):
+    """True for the names this service is really reached by: an IP address,
+    a single-label name (localhost, travelpi), *.local or *.ts.net. Anything
+    else is a DNS-rebinding attempt: a public name pointed at the Pi so a
+    hostile page counts as same-origin."""
+    if not host_header:
+        return False
+    host = host_header.strip()
+    if host.startswith("["):
+        host = host[1:host.find("]")] if "]" in host else ""
+    elif host.count(":") == 1:
+        host = host.split(":", 1)[0]
+    try:
+        ipaddress.ip_address(host)
+        return True
+    except ValueError:
+        pass
+    host = host.lower().rstrip(".")
+    return bool(host) and ("." not in host or host.endswith((".local", ".ts.net")))
+
+
+@app.before_request
+def refuse_cross_site():
+    if not host_allowed(request.headers.get("Host")):
+        return jsonify(ok=False, message="Unrecognised Host header"), 403
+    if request.method != "GET" and request.headers.get(CSRF_HEADER) != "1":
+        return jsonify(ok=False, message=f"Missing {CSRF_HEADER} header"), 403
+    return None
 
 
 def run(args, timeout=20):
@@ -185,7 +223,7 @@ input{width:100%;padding:10px;border-radius:8px;border:1px solid #2a2f4c;
 </main>
 <script>
 let picked=null;
-async function api(path,opts){const r=await fetch(path,opts);return r.json();}
+async function api(path,opts={}){opts.headers=Object.assign({'X-TravelPi':'1'},opts.headers||{});const r=await fetch(path,opts);return r.json();}
 function bars(s){const n=Math.max(0,Math.min(4,Math.round(s/25)));return "▂▄▆█".slice(0,n)+"·".repeat(4-n);}
 async function refresh(){
   try{const s=await api('/api/status');
