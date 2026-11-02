@@ -4,6 +4,8 @@ import argparse
 import json
 import mimetypes
 import os
+import re
+import shlex
 import shutil
 import socket
 import subprocess
@@ -16,6 +18,7 @@ from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).parent.resolve()
 WEB_ROOT = ROOT / "web"
+PACKAGE_NAME = re.compile(r"[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+")
 
 KEYS = {
     "up": "KEYCODE_DPAD_UP",
@@ -245,13 +248,22 @@ class FirestickRemote:
         text = value.strip()
         if not text:
             raise RemoteError(HTTPStatus.BAD_REQUEST, "Text is required")
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in text):
+            raise RemoteError(HTTPStatus.BAD_REQUEST, "Text cannot contain control characters")
         escaped = text.replace("%", "%25").replace(" ", "%s")
-        return self._shell_command(f"input text {escaped}", label="text")
+        # The command goes to the Firestick's shell, so quote it: unquoted,
+        # text such as `a;reboot` or `$(...)` ran as shell commands there.
+        return self._shell_command(f"input text {shlex.quote(escaped)}", label="text")
 
     def launch(self, package: str) -> dict[str, Any]:
         package = package.strip()
         if not package:
             raise RemoteError(HTTPStatus.BAD_REQUEST, "Package name is required")
+        # adb joins `adb shell` arguments into one command line for the
+        # device's shell, so a package name is shell input too. Accept only
+        # what Android allows in a package name.
+        if not PACKAGE_NAME.fullmatch(package):
+            raise RemoteError(HTTPStatus.BAD_REQUEST, "Invalid package name")
         self._ensure_connected()
         return self._adb("shell", "monkey", "-p", package, "-c", "android.intent.category.LAUNCHER", "1")
 
