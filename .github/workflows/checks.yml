@@ -1,0 +1,24 @@
+name: checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - name: Firestick remote tests
+        working-directory: firestick-remote-web
+        run: python -m unittest -v test_server.py
+      - name: Python syntax
+        run: python -m py_compile firestick-remote-web/server.py wifi-portal/app.py
+      - name: Shell syntax
+        run: for f in scripts/*.sh; do bash -n "$f"; done
