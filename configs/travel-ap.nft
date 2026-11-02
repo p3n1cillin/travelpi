@@ -14,4 +14,12 @@ table ip travelap {
         ip saddr 192.168.50.0/24 accept
         ip daddr 192.168.50.0/24 ct state established,related accept
     }
+    chain input {
+        type filter hook input priority filter + 10; policy accept;
+        # The WiFi portal (80) and Firestick remote (8787) have no login, so
+        # only the AP, Tailscale and the home LAN may reach them. wlan1 is
+        # always someone else's WiFi; on eth0 only the home subnet is allowed.
+        tcp dport { 80, 8787 } iifname "wlan1" drop
+        tcp dport { 80, 8787 } iifname "eth0" ip saddr != 192.168.0.0/24 drop
+    }
 }

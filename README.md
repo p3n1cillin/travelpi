@@ -189,6 +189,14 @@ sudo cp wifi-portal/travelpi-portal.service /etc/systemd/system/
 sudo systemctl enable --now travelpi-portal.service
 ```
 
+### Who can reach the portal and remote
+
+Neither the portal (port 80) nor the Firestick remote (8787) has a login, so the `input` chain in
+`configs/travel-ap.nft` drops them on the uplinks: always on `wlan1` (venue WiFi), and on `eth0`
+unless the client is on the home subnet `192.168.0.0/24`. The AP (`wlan0`), Tailscale and the
+home LAN are unaffected, and no other port (SSH included) is filtered. A venue wired network that
+also uses `192.168.0.0/24` would still get through, so prefer the AP or Tailscale when away.
+
 ## Split-tunnel routing (important)
 
 Tailscale runs with `--accept-routes` so the Pi can reach the home `192.168.0.0/24` subnet
